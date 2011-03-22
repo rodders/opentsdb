@@ -93,6 +93,11 @@ public interface Query {
   void downsample(int interval, Aggregator downsampler);
 
   /**
+   * Shift the time series forward in time to plot historical data on top of current data.
+   */
+  void timeshift(int distance);
+  
+  /**
    * Runs this query.
    * @return The data points matched by this query.
    * <p>

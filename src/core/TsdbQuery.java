@@ -66,6 +66,9 @@ final class TsdbQuery implements Query {
   /** End time (UNIX timestamp in seconds) on 32 bits ("unsigned" int). */
   private int end_time;
 
+  /** Amount of time to shift the metric forward */
+  private int shift_distance = 0;
+  
   /** ID of the metric being looked up. */
   private byte[] metric;
 
@@ -121,7 +124,7 @@ final class TsdbQuery implements Query {
           + ") is greater than or equal to end time: " + getEndTime());
     }
     // Keep the 32 bits.
-    start_time = (int) timestamp;
+    start_time = (int) timestamp - shift_distance;
   }
 
   public long getStartTime() {
@@ -139,7 +142,7 @@ final class TsdbQuery implements Query {
           + ") is less than or equal to start time: " + getStartTime());
     }
     // Keep the 32 bits.
-    end_time = (int) timestamp;
+    end_time = (int) timestamp - shift_distance;
   }
 
   public long getEndTime() {
@@ -160,6 +163,10 @@ final class TsdbQuery implements Query {
     this.rate = rate;
   }
 
+  public void timeshift(final int shift_distance) {  
+    this.shift_distance = shift_distance;  
+  }
+  
   public void downsample(final int interval, final Aggregator downsampler) {
     if (downsampler == null) {
       throw new NullPointerException("downsampler");
@@ -300,7 +307,7 @@ final class TsdbQuery implements Query {
                                             spans.values(),
                                             rate,
                                             aggregator,
-                                            sample_interval, downsampler);
+                                            sample_interval, downsampler, shift_distance);
       return new SpanGroup[] { group };
     }
 
@@ -343,7 +350,7 @@ final class TsdbQuery implements Query {
       if (thegroup == null) {
         thegroup = new SpanGroup(tsdb, getScanStartTime(), getScanEndTime(),
                                  null, rate, aggregator,
-                                 sample_interval, downsampler);
+                                 sample_interval, downsampler, shift_distance);
         // Copy the array because we're going to keep `group' and overwrite
         // its contents.  So we want the collection to have an immutable copy.
         final byte[] group_copy = new byte[group.length];

@@ -93,6 +93,9 @@ final class SpanGroup implements DataPoints {
   /** Minimum time interval (in seconds) wanted between each data point. */
   private final int sample_interval;
 
+  /** The amount of seconds to shift datapoints into the future. */
+  private final int shift_distance;
+  
   /**
    * Ctor.
    * @param tsdb The TSDB we belong to.
@@ -114,10 +117,11 @@ final class SpanGroup implements DataPoints {
             final Iterable<Span> spans,
             final boolean rate,
             final Aggregator aggregator,
-            final int interval, final Aggregator downsampler) {
+            final int interval, final Aggregator downsampler, final int shift_distance) {
     this.tsdb = tsdb;
     this.start_time = start_time;
     this.end_time = end_time;
+    this.shift_distance = shift_distance;
     if (spans != null) {
       for (final Span span : spans) {
         add(span);
@@ -141,7 +145,7 @@ final class SpanGroup implements DataPoints {
       throw new AssertionError("The set of tags has already been computed"
                                + ", you can't add more Spans to " + this);
     }
-    if (span.timestamp(0) <= end_time
+    if (span.timestamp(0) <= (end_time + shift_distance)
         // The following call to timestamp() will throw an
         // IndexOutOfBoundsException if size == 0, which is OK since it would
         // be a programming error.
@@ -497,7 +501,7 @@ final class SpanGroup implements DataPoints {
      * @param dp The last data point returned by that iterator.
      */
     private void putDataPoint(final int i, final DataPoint dp) {
-      timestamps[i] = dp.timestamp();
+      timestamps[i] = dp.timestamp() + shift_distance;
       if (dp.isInteger()) {
         //LOG.debug("Putting #" + i + " (long) " + dp.longValue()
         //          + " @ time " + dp.timestamp());
@@ -519,7 +523,7 @@ final class SpanGroup implements DataPoints {
       for (int i = 0; i < size; i++) {
         // As long as any of the iterators has a data point with a timestamp
         // that falls within our interval, we know we have at least one next.
-        if ((timestamps[size + i] & TIME_MASK) <= end_time) {
+        if ((timestamps[size + i] & TIME_MASK) <= (end_time + shift_distance)) {
           //LOG.debug("hasNext #" + (size + i));
           return true;
         }
@@ -552,7 +556,7 @@ final class SpanGroup implements DataPoints {
       boolean multiple = false;
       for (int i = 0; i < size; i++) {
         final long timestamp = timestamps[size + i] & TIME_MASK;
-        if (timestamp <= end_time) {
+        if (timestamp <= (end_time + shift_distance)) {
           if (timestamp < min_ts) {
             min_ts = timestamp;
             current = i;

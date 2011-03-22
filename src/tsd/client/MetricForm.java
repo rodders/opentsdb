@@ -160,7 +160,7 @@ final class MetricForm extends HorizontalPanel implements Focusable {
     url.append("&m=");
     url.append(selectedValue(aggregators));
     if (downsample.getValue()) {
-      url.append(':').append(interval.getValue())
+      url.append(":ds-").append(interval.getValue())
         .append('-').append(selectedValue(downsampler));
     }
     if (rate.getValue()) {

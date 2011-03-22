@@ -746,10 +746,6 @@ final class GraphHandler implements HttpRpc {
       // Where the parts in square brackets `[' .. `]' are optional.
       final String[] parts = Tags.splitString(m, ':');
       int i = parts.length;
-      if (i < 2 || i > 4) {
-        throw new BadRequestException("Invalid parameter m=" + m + " ("
-          + (i < 2 ? "not enough" : "too many") + " :-separated parts)");
-      }
       final Aggregator agg = getAggregator(parts[0]);
       i--;  // Move to the last part (the metric name).
       final HashMap<String, String> parsedtags = new HashMap<String, String>();
@@ -764,22 +760,32 @@ final class GraphHandler implements HttpRpc {
       } catch (NoSuchUniqueName e) {
         throw new BadRequestException(e.getMessage());
       }
-      // downsampling function & interval.
-      if (i > 0) {
-        final int dash = parts[1].indexOf('-', 1);  // 1st char can't be `-'.
-        if (dash < 0) {
-          throw new BadRequestException("Invalid downsampling specifier '"
-                                        + parts[1] + "' in m=" + m);
+      while ( i > 0 ) {
+        if (parts[i].startsWith("ds-")) {
+          String part = parts[i].substring(3);
+          logInfo(query, "parsed ds part " + part);
+          final int dash = part.indexOf('-', 1);  // 1st char can't be `-'.
+          if (dash < 0) {
+            throw new BadRequestException("Invalid parameter specifier '"
+                                          + parts[i] + "' in m=" + m);
+          }
+          Aggregator downsampler;
+          try {
+            downsampler = Aggregators.get(part.substring(dash + 1));
+          } catch (NoSuchElementException e) {
+            throw new BadRequestException("No such parameter: "
+                                          + part.substring(dash + 1));
+          }
+          final int interval = parseDuration(part.substring(0, dash));
+          tsdbquery.downsample(interval, downsampler);
         }
-        Aggregator downsampler;
-        try {
-          downsampler = Aggregators.get(parts[1].substring(dash + 1));
-        } catch (NoSuchElementException e) {
-          throw new BadRequestException("No such downsampling function: "
-                                        + parts[1].substring(dash + 1));
+        if (parts[i].startsWith("ts-")) {
+          String part = parts[i].substring(3);
+          final int distance = parseDuration(part);
+          logInfo(query, "Do a time shift of " + distance);
+          tsdbquery.timeshift(distance);
         }
-        final int interval = parseDuration(parts[1].substring(0, dash));
-        tsdbquery.downsample(interval, downsampler);
+        i--;
       }
       tsdbqueries[nqueries++] = tsdbquery;
     }
